@@ -17,6 +17,7 @@ export function InsightsPage() {
   const [aiSummary, setAiSummary] = useState<{ sentiment: string; average_score: number; common_complaints: string[]; top_praised_features: string[] } | null>(null);
   const [priceForecast, setPriceForecast] = useState<{ next_week_price: number; discount_probability: number; trend: string } | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analyzedReviewCount, setAnalyzedReviewCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -83,6 +84,7 @@ export function InsightsPage() {
           setAiSummary(null);
           setPriceForecast(null);
           setAnalysisLoading(false);
+          setAnalyzedReviewCount(0);
         }
         return;
       }
@@ -90,20 +92,51 @@ export function InsightsPage() {
       setAnalysisLoading(true);
 
       try {
-        const reviewsFromDb = await fetchProductReviews(selectedProduct.id).catch(() => []);
-        const mappedDbReviews = reviewsFromDb.map((review) => ({
-          text: review.text || '',
-          stars: Number(review.stars) || 0,
-          reviewer: review.reviewer || 'Anonymous',
-          date: review.date || 'Unknown date',
-          sentiment: review.sentiment || undefined
-        }));
+        const scopedReviewGroups = await Promise.all(
+          scopedProducts.map(async (product) => {
+            const reviewsFromDb = await fetchProductReviews(product.id).catch(() => []);
+            const mappedDbReviews = reviewsFromDb.map((review) => ({
+              text: review.text || '',
+              stars: Number(review.stars) || 0,
+              reviewer: review.reviewer || 'Anonymous',
+              date: review.date || 'Unknown date',
+              sentiment: review.sentiment || undefined
+            }));
 
-        const scrapeInput = selectedProduct.url && selectedProduct.url.startsWith('http') ? selectedProduct.url : '';
-        const scrapeData = scrapeInput ? await scrapeProduct(scrapeInput).catch(() => null) : null;
-        const analysisSource = mappedDbReviews.length ? mappedDbReviews : (scrapeData?.reviews ?? []);
+            if (mappedDbReviews.length) {
+              return mappedDbReviews;
+            }
 
-        const reviewAnalysis = analysisSource.length ? await analyzeReviewList(analysisSource).catch(() => null) : null;
+            const scrapeInput = product.url && product.url.startsWith('http') ? product.url : '';
+            if (!scrapeInput) {
+              return [];
+            }
+
+            const scrapeData = await scrapeProduct(scrapeInput).catch(() => null);
+            return (scrapeData?.reviews ?? []).map((review) => ({
+              text: review.text || '',
+              stars: Number(review.stars) || 0,
+              reviewer: review.reviewer || 'Anonymous',
+              date: review.date || 'Unknown date',
+              sentiment: review.sentiment || undefined
+            }));
+          })
+        );
+
+        const analysisSource = scopedReviewGroups
+          .flat()
+          .filter((review) => Boolean(review.text?.trim()));
+
+        const uniqueReviews = Array.from(
+          new Map(
+            analysisSource.map((review) => [
+              `${review.text.trim()}|${review.reviewer}|${review.date}`,
+              review
+            ])
+          ).values()
+        );
+
+        const reviewAnalysis = uniqueReviews.length ? await analyzeReviewList(uniqueReviews).catch(() => null) : null;
         const priceHistoryInput = [
           { price: selectedProduct.oldPrice > 0 ? selectedProduct.oldPrice : Math.max(1, selectedProduct.latestPrice * 1.08) },
           { price: selectedProduct.latestPrice }
@@ -113,11 +146,13 @@ export function InsightsPage() {
         if (active) {
           setAiSummary(reviewAnalysis);
           setPriceForecast(predictionData);
+          setAnalyzedReviewCount(uniqueReviews.length);
         }
       } catch {
         if (active) {
           setAiSummary(null);
           setPriceForecast(null);
+          setAnalyzedReviewCount(0);
         }
       } finally {
         if (active) {
@@ -131,7 +166,7 @@ export function InsightsPage() {
     return () => {
       active = false;
     };
-  }, [selectedProduct]);
+  }, [selectedProduct, scopedProducts]);
 
   const competitiveRows = useMemo(() => buildCompetitorComparison(scopedProducts), [scopedProducts]);
   const sentimentData = useMemo(() => buildSentimentBreakdown(scopedProducts), [scopedProducts]);
@@ -195,6 +230,7 @@ export function InsightsPage() {
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Badge tone="default">Scope: {selectedProduct ? `${selectedProduct.name} (${selectedProduct.competitor})` : 'No product selected'}</Badge>
           <Badge tone={analysisLoading ? 'warning' : 'success'}>{analysisLoading ? 'Analyzing reviews...' : 'Python sentiment API ready'}</Badge>
+          <Badge tone="default">Reviews analyzed: {analyzedReviewCount}</Badge>
         </div>
       </GlassCard>
 
