@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="PricePulse AI icon">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5b8cff"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0b1220"/>
+  <path d="M16 43V20h11.5c8.5 0 13.5 4.1 13.5 11.4 0 7.5-5 11.6-13.5 11.6H16zm8.5-6h2.7c3.7 0 5.7-1.8 5.7-5.6 0-3.6-2-5.4-5.7-5.4h-2.7V37z" fill="url(#g)"/>
+  <circle cx="47" cy="19" r="4.5" fill="#22d3ee"/>
+</svg>
