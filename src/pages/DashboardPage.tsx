@@ -16,7 +16,7 @@ export function DashboardPage() {
     try {
       const [productsData, groupedData] = await Promise.all([fetchProducts(), fetchProductWatchlists()]);
       const mergedProducts = applyProductOverrides(productsData);
-      setProducts(mergedProducts);
+      setProducts(mergedProducts.filter(p => p.isScraped));
       setWatchlistGroups(groupedData);
       setLastUpdatedAt(new Date().toISOString());
     } catch {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GlassCard, SectionHeader, Button, Badge } from '../components/ui';
+import { GlassCard, SectionHeader, Button, Badge, PulseLoader } from '../components/ui';
 import { RatingTrendChart, SentimentPieChart } from '../components/charts';
 import { ApiProduct, analyzeReviewList, fetchProductReviews, fetchProducts, predictPrice, scrapeProduct } from '../lib/api';
 import { formatCurrency } from '../lib/currency';
@@ -18,6 +18,7 @@ export function InsightsPage() {
   const [priceForecast, setPriceForecast] = useState<{ next_week_price: number; discount_probability: number; trend: string } | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analyzedReviewCount, setAnalyzedReviewCount] = useState(0);
+  const [analysisRunId, setAnalysisRunId] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -92,39 +93,26 @@ export function InsightsPage() {
       setAnalysisLoading(true);
 
       try {
-        const scopedReviewGroups = await Promise.all(
-          scopedProducts.map(async (product) => {
-            const reviewsFromDb = await fetchProductReviews(product.id).catch(() => []);
-            const mappedDbReviews = reviewsFromDb.map((review) => ({
-              text: review.text || '',
-              stars: Number(review.stars) || 0,
-              reviewer: review.reviewer || 'Anonymous',
-              date: review.date || 'Unknown date',
-              sentiment: review.sentiment || undefined
-            }));
+        const reviewsFromDb = await fetchProductReviews(selectedProduct.id).catch(() => []);
+        const mappedDbReviews = reviewsFromDb.map((review) => ({
+          text: review.text || '',
+          stars: Number(review.stars) || 0,
+          reviewer: review.reviewer || 'Anonymous',
+          date: review.date || 'Unknown date',
+          sentiment: review.sentiment || undefined
+        }));
 
-            if (mappedDbReviews.length) {
-              return mappedDbReviews;
-            }
+        const scrapeInput = selectedProduct.url && selectedProduct.url.startsWith('http') ? selectedProduct.url : '';
+        const scrapeData = scrapeInput ? await scrapeProduct(scrapeInput).catch(() => null) : null;
+        const mappedScrapeReviews = (scrapeData?.reviews ?? []).map((review) => ({
+          text: review.text || '',
+          stars: Number(review.stars) || 0,
+          reviewer: review.reviewer || 'Anonymous',
+          date: review.date || 'Unknown date',
+          sentiment: review.sentiment || undefined
+        }));
 
-            const scrapeInput = product.url && product.url.startsWith('http') ? product.url : '';
-            if (!scrapeInput) {
-              return [];
-            }
-
-            const scrapeData = await scrapeProduct(scrapeInput).catch(() => null);
-            return (scrapeData?.reviews ?? []).map((review) => ({
-              text: review.text || '',
-              stars: Number(review.stars) || 0,
-              reviewer: review.reviewer || 'Anonymous',
-              date: review.date || 'Unknown date',
-              sentiment: review.sentiment || undefined
-            }));
-          })
-        );
-
-        const analysisSource = scopedReviewGroups
-          .flat()
+        const analysisSource = [...mappedDbReviews, ...mappedScrapeReviews]
           .filter((review) => Boolean(review.text?.trim()));
 
         const uniqueReviews = Array.from(
@@ -166,7 +154,7 @@ export function InsightsPage() {
     return () => {
       active = false;
     };
-  }, [selectedProduct, scopedProducts]);
+  }, [selectedProduct, analysisRunId]);
 
   const competitiveRows = useMemo(() => buildCompetitorComparison(scopedProducts), [scopedProducts]);
   const sentimentData = useMemo(() => buildSentimentBreakdown(scopedProducts), [scopedProducts]);
@@ -203,6 +191,14 @@ export function InsightsPage() {
     window.print();
   }
 
+  function handleReanalyze() {
+    if (analysisLoading) {
+      return;
+    }
+
+    setAnalysisRunId((current) => current + 1);
+  }
+
   return (
     <div className="space-y-6">
       <GlassCard>
@@ -225,6 +221,9 @@ export function InsightsPage() {
             <Button variant="outline" onClick={exportCsv}>Export CSV</Button>
             <Button variant="primary" onClick={exportExcel}>Export Excel</Button>
             <Button variant="ghost" onClick={exportPdf}>Export PDF</Button>
+            <Button variant="accent" onClick={handleReanalyze} loading={analysisLoading} disabled={analysisLoading || !selectedProduct}>
+              Re-analyze
+            </Button>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -253,6 +252,11 @@ export function InsightsPage() {
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <GlassCard>
           <SectionHeader eyebrow="Python NLP" title="Review intelligence summary" description="These signals are generated by the FastAPI /analyze-reviews endpoint." />
+          {analysisLoading ? (
+            <div className="mt-5 rounded-2xl border border-border bg-black/25 p-5">
+              <PulseLoader label="Analyzing all reviews for selected product..." />
+            </div>
+          ) : null}
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <div className="rounded-2xl border border-border bg-white/5 p-4">
               <div className="text-xs uppercase tracking-[0.24em] text-muted">Overall sentiment</div>

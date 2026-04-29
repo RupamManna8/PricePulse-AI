@@ -52,22 +52,20 @@ function formatDateTime(value: string) {
 }
 
 function buildProductRows(items: WatchlistItem[], groups: ApiProductWatchlistGroup[]): ProductWatchRow[] {
-  if (groups.length) {
-    return groups.map((group) => ({
-      id: group.productKey,
-      productKey: group.productKey,
-      name: group.productName,
-      competitor: group.competitors[0]?.competitorName || 'Scraped',
-      previousPrice: group.previousPrice,
-      currentPrice: group.currentPrice,
-      difference: group.difference,
-      rating: group.rating,
-      lastUpdated: formatDateTime(group.lastUpdatedAt),
-      actionProductId: group.primaryProductId || group.competitors[0]?.productId || ''
-    }));
-  }
+  const groupedRows = groups.map((group) => ({
+    id: group.productKey,
+    productKey: group.productKey,
+    name: group.productName,
+    competitor: group.competitors[0]?.competitorName || 'Scraped',
+    previousPrice: group.previousPrice,
+    currentPrice: group.currentPrice,
+    difference: group.difference,
+    rating: group.rating,
+    lastUpdated: formatDateTime(group.lastUpdatedAt),
+    actionProductId: group.primaryProductId || group.competitors[0]?.productId || ''
+  }));
 
-  return items.filter((item) => Boolean(item.isCompetitor)).map((item) => {
+  const itemRows = items.map((item) => {
     const previousPrice = item.oldPrice;
     const currentPrice = item.latestPrice;
     const difference = Number((currentPrice - previousPrice).toFixed(2));
@@ -76,7 +74,7 @@ function buildProductRows(items: WatchlistItem[], groups: ApiProductWatchlistGro
       id: item.id,
       productKey: item.id,
       name: item.name,
-      competitor: item.competitor || 'Your Store',
+      competitor: item.competitor || (item.isCompetitor ? 'Scraped' : 'Own Store'),
       previousPrice: Number(previousPrice.toFixed(2)),
       currentPrice: Number(currentPrice.toFixed(2)),
       difference,
@@ -85,6 +83,12 @@ function buildProductRows(items: WatchlistItem[], groups: ApiProductWatchlistGro
       actionProductId: item.id
     };
   });
+
+  const rowsByKey = new Map<string, ProductWatchRow>();
+  groupedRows.forEach((row) => rowsByKey.set(row.id, row));
+  itemRows.forEach((row) => rowsByKey.set(row.id, row));
+
+  return Array.from(rowsByKey.values());
 }
 
 function buildCompetitorRows(items: WatchlistItem[]): CompetitorWatchRow[] {

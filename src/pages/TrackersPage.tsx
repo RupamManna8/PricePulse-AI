@@ -215,7 +215,7 @@ export function TrackersPage() {
         category: mode === 'make'
           ? (selectedOwnProduct?.category || form.category.trim() || extracted?.category || 'General')
           : (form.category.trim() || extracted?.category || 'General'),
-        isCompetitor: mode === 'make',
+        isCompetitor: true,
         scrape: extracted
       });
 

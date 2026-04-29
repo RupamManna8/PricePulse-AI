@@ -40,6 +40,7 @@ export type ApiProduct = {
   name: string;
   competitor: string;
   isCompetitor?: boolean;
+  isScraped?: boolean;
   category: string;
   latestPrice: number;
   rating: number;

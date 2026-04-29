@@ -120,7 +120,12 @@ export function ProductsPage() {
   }, [products, search, categoryFilter, sentimentFilter, minRating, minPrice, maxPrice]);
 
   const ownStoreProducts = useMemo(
-    () => filteredProducts.filter((product) => !product.isCompetitor),
+    () => filteredProducts.filter((product) => !product.isScraped),
+    [filteredProducts]
+  );
+
+  const scrapedProducts = useMemo(
+    () => filteredProducts.filter((product) => product.isScraped),
     [filteredProducts]
   );
 
@@ -297,7 +302,11 @@ export function ProductsPage() {
                   <div className="text-sm text-muted">{product.category}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge tone="success">Own store</Badge>
+                  {product.isScraped ? (
+                    <Badge tone="warning">Scraped</Badge>
+                  ) : (
+                    <Badge tone="success">Own store</Badge>
+                  )}
                   <Badge tone={product.availability.toLowerCase().includes('out') ? 'danger' : 'success'}>{product.availability}</Badge>
                 </div>
               </div>
@@ -356,6 +365,7 @@ export function ProductsPage() {
         <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted">
           <Badge tone="success">{filteredProducts.length} visible</Badge>
           <Badge tone="default">{ownStoreProducts.length} own</Badge>
+          <Badge tone="warning">{scrapedProducts.length} scraped</Badge>
           <Badge tone="warning">{watchlistIds.length} watched</Badge>
           <Button variant="ghost" type="button" onClick={() => setWatchlistIds([])}>Clear watchlist</Button>
         </div>
@@ -403,6 +413,18 @@ export function ProductsPage() {
 
         <div className="mt-5 space-y-4">
           {renderProductCards(ownStoreProducts, 'No own-store products yet. Add your first product above.')}
+        </div>
+      </GlassCard>
+
+      <GlassCard>
+        <SectionHeader
+          eyebrow="Scraped data"
+          title="Scraped products"
+          description="Products automatically scraped from competitor websites."
+        />
+
+        <div className="mt-5 space-y-4">
+          {renderProductCards(scrapedProducts, 'No scraped products found.')}
         </div>
       </GlassCard>
     </div>
